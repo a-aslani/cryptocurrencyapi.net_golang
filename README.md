@@ -1,6 +1,45 @@
 # cryptocurrencyapi.net with Go
 Implementation of cryptocurrency payment through cryptocurrencyapi.net service and transaction confirmation through IPN
 
+## Get Started
+Run backend
+```
+go run main.go
+```
+
+### request give
+GET http://localhost:8080/give HTTP/2.0
+
+
+### request IPN 
+This API is used by cryptocurrencyapi.net service
+
+POST http://localhost:8080/ipn HTTP/2.0
+
+Content-Type: application/json
+
+Body
+```json
+{
+    "cryptocurrencyapi.net": 3,
+    "chain": "tron",
+    "currency": "TRX",
+    "type": "in",
+    "date": 1714816683,
+    "from": "",
+    "to": "TM6WmP1kN4Hvu9ts....",
+    "token": "USDT",
+    "tokenContract": "TR7NHqjeKQxGTCi8q...",
+    "amount": "100",
+    "fee": "0",
+    "txid": "e5cdbdf10c9bf45b651dd6d86f28b3a5...",
+    "pos": 0,
+    "confirmation": 100,
+    "label": "user_id",
+    "sign": "f7bdd026b533c7b134037d795af024ea06f059ac"
+}
+```
+
 ## IPN data verification algorithm
 To check the signature you need to:
 1) remember the received signature (sign field) from the data
