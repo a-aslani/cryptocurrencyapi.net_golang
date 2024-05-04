@@ -73,7 +73,7 @@ hashKey := fmt.Sprintf("%x", md5.Sum([]byte("YOUR_API_KEY")))
 sign := fmt.Sprintf("%s:%s", signData, hashKey)
 hashSign := fmt.Sprintf("%x", sha1.Sum([]byte(sign)))
 
-if hashSign != request.Sign {
+if hashSign != inputStruct.Sign {
     fmt.Println("sign wrong")
 } else {
     fmt.Println("OK")
