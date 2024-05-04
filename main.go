@@ -3,16 +3,20 @@ package main
 import (
 	"crypto/md5"
 	"crypto/sha1"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 const (
@@ -38,6 +42,21 @@ type CryptocurrencyApiIPNRequest struct {
 	Sign                 string `json:"sign"`
 }
 
+type WalletModel struct {
+	Name    string `json:"name"`
+	Qrcode  string `json:"qrcode"`
+	Address string `json:"address"`
+}
+
+type CryptocurrencyApiResponse struct {
+	Result struct {
+		Address    string `json:"address"`
+		PublicKey  string `json:"publicKey"`
+		PrivateKey string `json:"privateKey"`
+		QR         string `json:"QR"`
+	} `json:"result"`
+}
+
 func main() {
 
 	r := gin.Default()
@@ -48,12 +67,55 @@ func main() {
 	})
 
 	r.POST("/ipn", IpnHandler)
+	r.GET("/give", GiveHandler)
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal(err)
 		return
 	}
+}
 
+func GiveHandler(c *gin.Context) {
+
+	// list of your cryptocurrencies on cryptocurrencyapi.net
+	endpoints := map[string]string{
+		"USDT":     "/trx/.give?key={key}&label={label}&period={period}&token=USDT",
+		"Bitcoin":  "/btc/.give?key={key}&label={label}&period={period}&token=BTC",
+		"Ethereum": "/eth/.give?key={key}&label={label}&period={period}",
+		"Litecoin": "/ltc/.give?key={key}&label={label}&period={period}&token=LTC",
+		// other coins...
+	}
+
+	wallets := make([]*WalletModel, 0)
+
+	var wg sync.WaitGroup
+
+	wg.Add(len(endpoints))
+
+	// fetch concurrent address
+	for name, endpoint := range endpoints {
+
+		go func(name string, endpoint string, wg *sync.WaitGroup) {
+
+			defer wg.Done()
+
+			wallet, err := fetchAddress("user_id", endpoint)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+
+			wallet.Name = name
+			wallets = append(wallets, wallet)
+
+		}(name, endpoint, &wg)
+	}
+
+	wg.Wait()
+
+	c.JSON(http.StatusOK, gin.H{
+		"wallets": wallets,
+	})
 }
 
 func IpnHandler(c *gin.Context) {
@@ -132,6 +194,45 @@ func IpnHandler(c *gin.Context) {
 		"message": "OK",
 		"data":    request,
 	})
+}
+
+// fetchAddress Provides an address for incoming payments. Returns an address, its public key and (if enabled by settings) its private key.
+// Typically, such addresses are temporary or transit.
+func fetchAddress(label string, endpoint string) (*WalletModel, error) {
+
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	reqUrl := fmt.Sprintf("%s%s", "https://new.cryptocurrencyapi.net/api", endpoint)
+	reqUrl = fmt.Sprint(strings.Replace(reqUrl, "{key}", fmt.Sprintf("%s", ApiKey), 1))
+	reqUrl = fmt.Sprint(strings.Replace(reqUrl, "{label}", fmt.Sprintf("%s", label), 1))
+	reqUrl = fmt.Sprint(strings.Replace(reqUrl, "{period}", fmt.Sprintf("%s", "10"), 1))
+
+	req, err := http.NewRequest("POST", reqUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	var result CryptocurrencyApiResponse
+	if err = json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == 200 {
+		return &WalletModel{
+			Qrcode:  result.Result.QR,
+			Address: result.Result.Address,
+		}, nil
+	} else {
+		return nil, errors.New(fmt.Sprintf("error code: %d", resp.StatusCode))
+	}
 }
 
 // checkSign IPN data verification algorithm
