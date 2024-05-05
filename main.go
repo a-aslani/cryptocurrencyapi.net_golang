@@ -43,9 +43,11 @@ type CryptocurrencyApiIPNRequest struct {
 }
 
 type WalletModel struct {
-	Name    string `json:"name"`
-	Qrcode  string `json:"qrcode"`
-	Address string `json:"address"`
+	Name       string `json:"name"`
+	Qrcode     string `json:"qrcode"`
+	Address    string `json:"address"`
+	PublicKey  string `json:"publicKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 type CryptocurrencyApiResponse struct {
@@ -227,8 +229,10 @@ func fetchAddress(label string, endpoint string) (*WalletModel, error) {
 
 	if resp.StatusCode == 200 {
 		return &WalletModel{
-			Qrcode:  result.Result.QR,
-			Address: result.Result.Address,
+			Qrcode:     result.Result.QR,
+			Address:    result.Result.Address,
+			PublicKey:  result.Result.PublicKey,
+			PrivateKey: result.Result.PrivateKey,
 		}, nil
 	} else {
 		return nil, errors.New(fmt.Sprintf("error code: %d", resp.StatusCode))
